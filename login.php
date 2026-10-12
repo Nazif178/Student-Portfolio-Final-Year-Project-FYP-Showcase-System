@@ -56,6 +56,6 @@ include "header.php";
         <button type="submit">Login</button>
     </form>
     <p>New user? <a href="register.php">Register as a Student</a>.</p>
-    <p class="small-muted">Admin login: <strong>admin@gmail.com</strong> / <strong>1234</strong></p>
+    <p class="small-muted">Admin login: <strong>admin@admin.com</strong> / <strong>1234</strong></p>
 </div>
 <?php include "footer.php"; ?>

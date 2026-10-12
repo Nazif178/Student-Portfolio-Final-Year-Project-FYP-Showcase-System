@@ -1,5 +1,3 @@
-
-1
 <?php
 session_start();
 require "db.php";

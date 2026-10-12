@@ -1,101 +1,66 @@
 <?php
 session_start();
 require "db.php";
+require "functions.php";
 
-$message = "";
+if (!empty($_SESSION["user_id"])) {
+    header("Location: " . (($_SESSION["role"] ?? "") === "Admin" ? "admin_dashboard.php" : "student_dashboard.php"));
+    exit();
+}
 
-// Run when the registration form is submitted
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+$error = "";
+$success = "";
 
-    // Get the form values
-    $name = trim($_POST["full_name"]);
-    $email = trim($_POST["email"]);
-    $password = $_POST["password"];
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $name = trim($_POST["full_name"] ?? "");
+    $email = trim($_POST["email"] ?? "");
+    $password = $_POST["password"] ?? "";
 
-    // Check for empty fields
-    if ($name == "" || $email == "" || $password == "") {
-        $message = "Please fill in all fields.";
-
-    // Check email format
+    if ($name === "" || $email === "" || $password === "") {
+        $error = "Please fill in every field.";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message = "Please enter a valid email.";
-
-    // Require at least 8 characters
+        $error = "Please enter a valid email address.";
     } elseif (strlen($password) < 8) {
-        $message = "Password must be at least 8 characters.";
-
+        $error = "Password must contain at least 8 characters.";
     } else {
-        // Hash the password before saving
+        // Public registration always creates a Student account.
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $conn->prepare("INSERT INTO users (full_name, email, password, role) VALUES (?, ?, ?, 'Student')");
 
-        // Prepare the SQL statement
-        $stmt = $conn->prepare(
-            "INSERT INTO users (full_name, email, password, role)
-             VALUES (?, ?, ?, 'Student')"
-        );
-
-        // Attach values to the SQL placeholders
-        $stmt->bind_param("sss", $name, $email, $hashedPassword);
-
-        // Save the account
-        if ($stmt->execute()) {
-            $message = "Registration successful. Please login.";
+        if (!$stmt) {
+            $error = "Could not prepare registration. Check your database tables.";
         } else {
-            // Error code 1062 means duplicate email
-            if ($stmt->errno == 1062) {
-                $message = "Email already registered.";
+            $stmt->bind_param("sss", $name, $email, $hashedPassword);
+
+            if ($stmt->execute()) {
+                $success = "Registration successful. You can now log in.";
+            } elseif ($stmt->errno === 1062) {
+                $error = "That email address is already registered.";
             } else {
-                $message = "Registration failed. Please try again.";
+                $error = "Registration failed. Please try again.";
             }
+            $stmt->close();
         }
-
-        $stmt->close();
     }
 }
+include "header.php";
 ?>
+<div class="form-card">
+    <h2>Create Student Account</h2>
+    <?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
+    <?php if ($success): ?><div class="alert success"><?= e($success) ?> <a href="login.php">Log in</a></div><?php endif; ?>
+    <form method="post" action="register.php">
+        <label for="full_name">Full name</label>
+        <input id="full_name" name="full_name" maxlength="100" required value="<?= e($_POST["full_name"] ?? "") ?>">
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Student Registration</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" maxlength="150" required value="<?= e($_POST["email"] ?? "") ?>">
 
-<h2>Student Registration</h2>
+        <label for="password">Password (at least 8 characters)</label>
+        <input id="password" type="password" name="password" minlength="8" required>
 
-<p><?php echo htmlspecialchars($message); ?></p>
-
-<form method="POST" onsubmit="return validateForm()">
-
-    <label>Full Name</label>
-    <input type="text" name="full_name" required>
-
-    <label>Email</label>
-    <input type="email" name="email" required>
-
-    <label>Password (minimum 8 characters)</label>
-    <input type="password" name="password" id="password" required>
-
-    <button type="submit">Register</button>
-
-</form>
-
-<p>Already registered? <a href="login.php">Login</a></p>
-
-<script>
-// Simple client-side password validation
-function validateForm() {
-    let password = document.getElementById("password").value;
-
-    if (password.length < 8) {
-        alert("Password must be at least 8 characters.");
-        return false;
-    }
-
-    return true;
-}
-</script>
-
-</body>
-</html>
+        <button type="submit">Register</button>
+    </form>
+    <p>Already registered? <a href="login.php">Log in here</a>.</p>
+</div>
+<?php include "footer.php"; ?>
